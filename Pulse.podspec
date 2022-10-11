@@ -14,6 +14,7 @@ s.license      = "MIT"
 s.author       = { "kean" => "https://github.com/kean" }
 s.social_media_url = "https://kean.blog/"
 s.ios.deployment_target = "13.0"
+s.source       = { :git => "git@github.com:kean/Pulse.git", :tag => "#{s.version}" }
 
 s.source_files = "Sources/Pulse/**/*.swift"
 
