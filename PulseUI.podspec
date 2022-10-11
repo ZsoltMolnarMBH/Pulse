@@ -15,7 +15,6 @@ s.author       = { "kean" => "https://github.com/kean" }
 s.social_media_url = "https://kean.blog/"
 s.ios.deployment_target = "13.0"
 
-s.source = { :http => "https://github.com/kean/Pulse/releases/download/#{s.version}/pulse-xcframeworks-ios.zip" }
-s.ios.vendored_frameworks = "PulseUI.xcframework/"
+s.source_files = "Sources/PulseUI/**/*.swift"
 
 end
