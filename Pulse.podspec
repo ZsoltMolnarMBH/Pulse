@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
 s.name          = "Pulse"
-s.version       = "2.1.3"
+s.version       = "3.7.2"
 s.summary       = "Pulse is a powerful logging system for Apple Platforms. Native. Built with SwiftUI."
 s.swift_version = "5.6"
 
