@@ -1,81 +1,33 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 import CommonCrypto
 import CoreData
+import Combine
 
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
+extension Character {
+    init?(_ code: unichar) {
+        guard let scalar = UnicodeScalar(code) else {
+            return nil
         }
+        self = Character(scalar)
     }
 }
 
-func prettifyJSON(_ data: Data) -> String {
-    guard let json = try? JSONSerialization.jsonObject(with: data, options: []) else {
-        return String(data: data, encoding: .utf8) ?? ""
-    }
-    guard let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) else {
-        return String(data: data, encoding: .utf8) ?? ""
-    }
-    return String(data: pretty, encoding: .utf8) ?? ""
-}
-
-extension String {
-    /// Finds all occurrences of the given string
-    func ranges(of substring: String, options: String.CompareOptions = []) -> [Range<String.Index>] {
-        var index = startIndex
-        var ranges = [Range<String.Index>]()
-        while index < endIndex, let range = range(of: substring, options: options, range: index..<endIndex, locale: nil) {
-            ranges.append(range)
-            if index == range.upperBound {
-                index = self.index(after: index) // Regex found empty match, move along
-            } else {
-                index = range.upperBound
-            }
-        }
-        return ranges
+@available(iOS 15, *)
+extension AttributedString {
+    init(_ string: String, _ configure: (inout AttributeContainer) -> Void) {
+        var attributes = AttributeContainer()
+        configure(&attributes)
+        self.init(string, attributes: attributes)
     }
 
-    /// Returns first range of substring.
-    func firstRange(of substring: String, options: String.CompareOptions = []) -> Range<String.Index>? {
-        range(of: substring, options: options, range: startIndex..<endIndex, locale: nil)
-    }
-}
-
-struct StringSearchOptions {
-    var isRegex: Bool = false
-    var isCaseSensitive: Bool = false
-    var kind: Kind = .contains
-
-    static let `default` = StringSearchOptions()
-
-    enum Kind: String, CaseIterable {
-        case begins = "Begins With"
-        case contains = "Contains"
-        case ends = "Ends With"
-    }
-}
-
-extension String.CompareOptions {
-    init(_ options: StringSearchOptions) {
-        self.init()
-        if options.isRegex { insert(.regularExpression) }
-        if !options.isCaseSensitive { insert(.caseInsensitive) }
-        if !options.isRegex {
-            switch options.kind {
-            case .begins:
-                insert(.anchored)
-            case .ends:
-                insert(.anchored)
-                insert(.backwards)
-            case .contains:
-                break
-            }
-        }
+    mutating func append(_ string: String, _ configure: (inout AttributeContainer) -> Void) {
+        var attributes = AttributeContainer()
+        configure(&attributes)
+        self.append(AttributedString(string, attributes: attributes))
     }
 }
 
@@ -85,33 +37,16 @@ extension NSManagedObject {
     }
 }
 
-extension NSMutableAttributedString {
-    func append(_ string: String, _ attributes: [NSAttributedString.Key: Any] = [:]) {
-        append(NSAttributedString(string: string, attributes: attributes))
-    }
-
-    func addAttributes(_ attributes: [NSAttributedString.Key: Any]) {
-        addAttributes(attributes, range: NSRange(location: 0, length: string.count))
-    }
-}
-
-extension NSObject {
-    static var deinitKey = "Pulse.NSObject.deinitKey"
-
-    class Container {
-        let closure: () -> Void
-
-        init(_ closure: @escaping () -> Void) {
-            self.closure = closure
+extension NSManagedObjectContext {
+    func getDistinctValues(entityName: String, property: String) -> Set<String> {
+        let request = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+        request.resultType = .dictionaryResultType
+        request.returnsDistinctResults = true
+        request.propertiesToFetch = [property]
+        guard let results = try? fetch(request) as? [[String: String]] else {
+            return []
         }
-
-        deinit {
-            closure()
-        }
-    }
-
-    func onDeinit(_ closure: @escaping () -> Void) {
-        objc_setAssociatedObject(self, &NSObject.deinitKey, Container(closure), .OBJC_ASSOCIATION_RETAIN)
+        return Set(results.flatMap { $0.values })
     }
 }
 

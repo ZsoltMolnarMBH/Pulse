@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 
@@ -67,6 +67,7 @@ private final class CustomHTTPProtocol: URLProtocol {
         guard CustomHTTPProtocol.shouldHandleRequest(request) else {
             return false
         }
+        #warning("check if this works")
         if CustomHTTPProtocol.property(forKey: Constants.RequestHandledKey, in: request) != nil {
             return false
         }

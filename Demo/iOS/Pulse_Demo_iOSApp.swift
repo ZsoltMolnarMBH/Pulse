@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import SwiftUI
 import Pulse
@@ -10,8 +10,11 @@ import PulseUI
 struct Pulse_Demo_iOSApp: App {
     var body: some Scene {
 //        let _ = testProxy()
+        
         WindowGroup {
-            MainView(store: .mock)
+            NavigationView {
+                ConsoleView(store: .demo)
+            }
         }
     }
 }
@@ -24,9 +27,11 @@ private func testProxy() {
 
     let session = URLSession(configuration: .default, delegate: MockSessionDelegate(), delegateQueue: nil)
 
-    let task = session.downloadTask(with: URLRequest(url: URL(string: "https://github.com/kean/Nuke/archive/refs/tags/11.0.0.zip")!))
-//    task = session.dataTask(with: URL(string: "https://github.com/CreateAPI/Get")!)
-    task.resume()
+    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(5)) {
+        let task = session.dataTask(with: URLRequest(url: URL(string: "https://github.com/kean/Nuke/archive/refs/tags/11.0.0.zip")!))
+        //    task = session.dataTask(with: URL(string: "https://github.com/CreateAPI/Get")!)
+        task.resume()
+    }
 }
 
 private final class MockSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDownloadDelegate {

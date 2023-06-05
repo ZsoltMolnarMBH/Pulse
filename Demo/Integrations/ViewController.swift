@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020-2023 Alexander Grebenyuk (github.com/kean).
 
 import UIKit
 import PulseUI
@@ -19,15 +19,11 @@ final class ViewController: UIViewController, UITableViewDataSource, UITableView
         sections = [
             MenuSection(title: "Main", footer: "Demonstartes how to show the entire PulseUI interface (all four tabs)", items: [
                 MenuItem(title: "MainViewController", isPush: false, action: { [unowned self] in
-                    let vc = MainViewController(store: .mock, onDismiss: { [weak self] in
-                        self?.dismiss(animated: true, completion: nil)
-                    })
+                    let vc = MainViewController(store: .mock)
                     self.present(vc, animated: true, completion: nil)
                 }),
                 MenuItem(title: "MainViewController (Fullscreen)", isPush: false, action: { [unowned self] in
-                    let vc = MainViewController(store: .mock, onDismiss: { [weak self] in
-                        self?.dismiss(animated: true, completion: nil)
-                    })
+                    let vc = MainViewController(store: .mock)
                     vc.modalPresentationStyle = .fullScreen
                     self.present(vc, animated: true, completion: nil)
                 })
@@ -37,12 +33,12 @@ final class ViewController: UIViewController, UITableViewDataSource, UITableView
                     let vc = UIHostingController(rootView: ConsoleView(store: .mock))
                     self.navigationController?.pushViewController(vc, animated: true)
                 }),
-                MenuItem(title: "NetworkView", action: { [unowned self] in
-                    let vc = UIHostingController(rootView: NetworkView(store: .mock))
+                MenuItem(title: "ConsoleView (Logs)", action: { [unowned self] in
+                    let vc = UIHostingController(rootView: ConsoleView(store: .mock, mode: .logs))
                     self.navigationController?.pushViewController(vc, animated: true)
                 }),
-                MenuItem(title: "PinsView", action: { [unowned self] in
-                    let vc = UIHostingController(rootView: PinsView(store: .mock))
+                MenuItem(title: "ConsoleView (Network)", action: { [unowned self] in
+                    let vc = UIHostingController(rootView: ConsoleView(store: .mock, mode: .network))
                     self.navigationController?.pushViewController(vc, animated: true)
                 })
             ]),

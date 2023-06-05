@@ -1,12 +1,8 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
-#if !os(macOS) && !targetEnvironment(macCatalyst) && swift(>=5.7)
 import Foundation
-#else
-@preconcurrency import Foundation
-#endif
 
 extension LoggerStore {
     /// The store info.
@@ -61,6 +57,8 @@ extension LoggerStore {
             public let name: String?
             public let version: String?
             public let build: String?
+            /// Base64-encoded app icon (32x32 pixels). Added in 3.5.7
+            public let icon: String?
         }
 
         public struct DeviceInfo: Codable, Sendable {
@@ -74,7 +72,7 @@ extension LoggerStore {
         /// Reads info from the given archive.
         ///
         /// - important: This API is designed to be used only with Pulse documents
-        /// exported from the app without unarchaving the document. If you need
+        /// exported from the app without unarchiving the document. If you need
         /// to get info about the current store, use ``LoggerStore/Info``.
         public static func make(storeURL: URL) throws -> Info {
             let document = try PulseDocument(documentURL: storeURL)
@@ -98,9 +96,21 @@ extension LoggerStore.Info.AppInfo {
             bundleIdentifier: AppInfo.bundleIdentifier,
             name: AppInfo.appName,
             version: AppInfo.appVersion,
-            build: AppInfo.appBuild
+            build: AppInfo.appBuild,
+            icon: getAppIcon()?.base64EncodedString()
         )
     }
+}
+
+private func getAppIcon() -> Data? {
+    guard let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String:Any],
+          let primaryIcons = icons["CFBundlePrimaryIcon"] as? [String:Any],
+          let files = primaryIcons["CFBundleIconFiles"] as? [String],
+          let lastIcon = files.last,
+          let image = PlatformImage(named: lastIcon),
+          let data = Graphics.encode(image),
+          let thumbnail = Graphics.makeThumbnail(from: data, targetSize: 32) else { return nil }
+    return Graphics.encode(thumbnail)
 }
 
 #if os(iOS) || os(tvOS)

@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 import SwiftUI
@@ -8,7 +8,6 @@ import Combine
 import Pulse
 import Network
 
-@available(iOS 14.0, tvOS 14.0, *)
 struct RemoteLoggerSettingsView: View {
     @ObservedObject var viewModel: RemoteLoggerSettingsViewModel
     
@@ -19,6 +18,9 @@ struct RemoteLoggerSettingsView: View {
                 Image(systemName: "network")
 #endif
                 Text("Remote Logging")
+#if os(macOS)
+                Spacer()
+#endif
             }
         })
         if viewModel.isEnabled {
@@ -62,9 +64,16 @@ struct RemoteLoggerSettingsView: View {
                             .font(.system(size: 16, weight: .medium))
                             .frame(width: 21, height: 36, alignment: .center)
                     } else {
+                        #if os(macOS)
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .frame(width: 15, height: 44, alignment: .leading)
+                            .scaleEffect(0.5)
+                        #else
                         ProgressView()
                             .progressViewStyle(.circular)
                             .frame(width: 21, height: 36, alignment: .leading)
+                        #endif
                     }
                 } else {
                     Rectangle()
@@ -80,7 +89,6 @@ struct RemoteLoggerSettingsView: View {
     }
 }
 
-@available(iOS 14.0, tvOS 14.0, *)
 final class RemoteLoggerSettingsViewModel: ObservableObject {
     @Published var isEnabled: Bool = false
     @Published var servers: [RemoteLoggerServerViewModel] = []
@@ -141,7 +149,6 @@ struct RemoteLoggerServerViewModel: Identifiable {
     let connect: () -> Void
 }
 
-@available(iOS 14.0, tvOS 14.0, *)
 private extension NWBrowser.Result {
     var name: String? {
         switch endpoint {
@@ -156,10 +163,8 @@ private extension NWBrowser.Result {
 #if DEBUG
 struct RemoteLoggerSettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        if #available(iOS 14.0, tvOS 14.0, *) {
-            RemoteLoggerSettingsView(viewModel: .shared)
-                .previewLayout(.sizeThatFits)
-        }
+        RemoteLoggerSettingsView(viewModel: .shared)
+            .previewLayout(.sizeThatFits)
     }
 }
 #endif

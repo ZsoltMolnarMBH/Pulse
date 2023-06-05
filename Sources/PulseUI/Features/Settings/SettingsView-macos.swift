@@ -1,74 +1,70 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
+
+#if os(macOS)
 
 import SwiftUI
 import Pulse
 
-#if os(macOS)
-import UniformTypeIdentifiers
+struct SettingsView: View {
+    @State private var isPresentingShareStoreView = false
+    @State private var shareItems: ShareItems?
 
-public struct SettingsView: View {
-    @ObservedObject var viewModel: SettingsViewModel
-    @Environment(\.presentationMode) var presentationMode
-    var store: LoggerStore { viewModel.store }
+    @Environment(\.store) private var store
 
-    @State private var isDocumentBrowserPresented = false
-
-    public init(store: LoggerStore = .shared) {
-        self.viewModel = SettingsViewModel(store: store)
-    }
-
-    init(viewModel: SettingsViewModel) {
-        self.viewModel = viewModel
-    }
-
-    public var body: some View {
-        VStack {
-            List {
-                HStack {
-                    Text("Settings")
-                        .font(.title)
-                    Spacer()
-                    Button("Close") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-                Section(header: Text("Open Store")) {
-                    Button("Open in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([store.storeURL])
-                    }
-                    Button("Open in Pulse Pro") {
-                        NSWorkspace.shared.open(store.storeURL)
-                    }
-                }
-                Section(header: Text("Manage Messages")) {
-                    if !viewModel.isArchive {
-                        ButtonRemoveAll(action: viewModel.buttonRemoveAllMessagesTapped)
-                    }
-                }
-                Section(header: Text("Remote Logging")) {
-                    if viewModel.isRemoteLoggingAvailable {
+    var body: some View {
+        ScrollView {
+            Form {
+                ConsoleSection(header: { SectionHeaderView(title: "Remote Logging") }) {
+                    if store === RemoteLogger.shared.store {
                         RemoteLoggerSettingsView(viewModel: .shared)
                     } else {
                         Text("Not available")
                             .foregroundColor(.secondary)
                     }
                 }
+                Divider()
+                StoreDetailsView(source: .store(store))
             }
         }
-        .listStyle(.sidebar)
-        .frame(width: 260, height: 400)
     }
 }
 
 // MARK: - Preview
 
 #if DEBUG
-struct ConsoleSettingsView_Previews: PreviewProvider {
+struct UserSettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(viewModel: SettingsViewModel(store: .shared))
+        SettingsView()
     }
 }
 #endif
+#endif
+
+#if os(iOS) || os(macOS)
+
+import SwiftUI
+
+struct SectionHeaderView: View {
+    var systemImage: String?
+    let title: String
+
+    var body: some View {
+        HStack {
+            if let systemImage = systemImage {
+                Image(systemName: systemImage)
+            }
+            Text(title)
+                .lineLimit(1)
+                .font(.headline)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+#if os(macOS)
+        .padding(.bottom, 8)
+#endif
+    }
+}
+
 #endif

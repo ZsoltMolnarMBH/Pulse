@@ -1,8 +1,15 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import CoreData
+
+public final class LoggerSessionEntity: NSManagedObject {
+    @NSManaged public var createdAt: Date
+    @NSManaged public var id: UUID
+    @NSManaged public var version: String?
+    @NSManaged public var build: String?
+}
 
 public final class LoggerMessageEntity: NSManagedObject {
     @NSManaged public var createdAt: Date
@@ -13,16 +20,11 @@ public final class LoggerMessageEntity: NSManagedObject {
     @NSManaged public var file: String
     @NSManaged public var function: String
     @NSManaged public var line: Int32 // Doubles as request state storage to save space
-    @NSManaged public var label: LoggerLabelEntity
+    @NSManaged public var label: String
     @NSManaged public var rawMetadata: String
     @NSManaged public var task: NetworkTaskEntity?
 
-    public lazy var metadata = KeyValueEncoding.decodeKeyValuePairs(rawMetadata)
-}
-
-public final class LoggerLabelEntity: NSManagedObject {
-    @NSManaged public var name: String
-    @NSManaged public var count: Int64
+    public lazy var metadata = { KeyValueEncoding.decodeKeyValuePairs(rawMetadata) }()
 }
 
 public final class NetworkTaskEntity: NSManagedObject {
@@ -40,7 +42,7 @@ public final class NetworkTaskEntity: NSManagedObject {
     // MARK: Request
 
     @NSManaged public var url: String?
-    @NSManaged public var host: NetworkDomainEntity?
+    @NSManaged public var host: String?
     @NSManaged public var httpMethod: String?
 
     // MARK: Response
@@ -95,7 +97,7 @@ public final class NetworkTaskEntity: NSManagedObject {
 
     // MARK: Helpers
 
-    public lazy var metadata = rawMetadata.map(KeyValueEncoding.decodeKeyValuePairs)
+    public lazy var metadata = { rawMetadata.map(KeyValueEncoding.decodeKeyValuePairs) }()
 
     /// Returns request state.
     public var state: State {
@@ -135,11 +137,6 @@ public final class NetworkTaskEntity: NSManagedObject {
     public var decodingError: NetworkLogger.DecodingError? {
         error as? NetworkLogger.DecodingError
     }
-}
-
-public final class NetworkDomainEntity: NSManagedObject {
-    @NSManaged public var value: String
-    @NSManaged public var count: Int64
 }
 
 /// Indicates current download or upload progress.
@@ -251,7 +248,7 @@ public final class NetworkRequestEntity: NSManagedObject {
         headers["Content-Type"].flatMap(NetworkLogger.ContentType.init)
     }
 
-    public lazy var headers: [String: String] = KeyValueEncoding.decodeKeyValuePairs(httpHeaders)
+    public lazy var headers: [String: String] = { KeyValueEncoding.decodeKeyValuePairs(httpHeaders) }()
 }
 
 public final class NetworkResponseEntity: NSManagedObject {
@@ -266,7 +263,7 @@ public final class NetworkResponseEntity: NSManagedObject {
         headers["Content-Length"].flatMap { Int64($0) }
     }
 
-    public lazy var headers: [String: String] = KeyValueEncoding.decodeKeyValuePairs(httpHeaders)
+    public lazy var headers: [String: String] = { KeyValueEncoding.decodeKeyValuePairs(httpHeaders) }()
 }
 
 /// Doesn't contain any data, just the key and some additional payload.
@@ -279,6 +276,15 @@ public final class LoggerBlobHandleEntity: NSManagedObject {
 
     /// A decompressed blob size.
     @NSManaged public var decompressedSize: Int32
+
+    @NSManaged var isUncompressed: Bool
+
+    @NSManaged var rawContentType: String?
+
+    /// A blob content type.
+    public var contentType: NetworkLogger.ContentType? {
+        rawContentType.flatMap(NetworkLogger.ContentType.init)
+    }
 
     /// A number of requests referencing it.
     @NSManaged var linkCount: Int16
@@ -307,5 +313,18 @@ public final class LoggerBlobHandleEntity: NSManagedObject {
             return nil // Should never happen unless the object was created outside of the LoggerStore moc
         }
         return store.store?.getDecompressedData(for: self)
+    }
+
+    /// Returns a closure to fetch the entity's data that can be executed
+    /// on any thread.
+    ///
+    /// - warning: Not meant to be used outside of the framework.
+    public static func getData(for entity: LoggerBlobHandleEntity, store: LoggerStore) -> () -> Data? {
+        let inlineData = entity.inlineData
+        let key = entity.key
+        let isCompressed = !entity.isUncompressed
+        return {
+            store.getDecompressedData(for: inlineData, key: key, isCompressed: isCompressed)
+        }
     }
 }

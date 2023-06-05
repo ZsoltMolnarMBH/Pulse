@@ -1,37 +1,21 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020-2023 Alexander Grebenyuk (github.com/kean).
 
 import XCTest
 import Foundation
 import CoreData
+import Combine
 @testable import Pulse
 
-final class LoggerStoreTests: XCTestCase {
-    let directory = TemporaryDirectory()
-    var storeURL: URL!
-    var date: Date = Date()
-
-    var store: LoggerStore!
+final class LoggerStoreTests: LoggerStoreBaseTests {
+    // MARK: - Init
 
     override func setUp() {
         super.setUp()
 
-        try? FileManager.default.createDirectory(at: directory.url, withIntermediateDirectories: true, attributes: nil)
-        storeURL = directory.url.appending(filename: "test-store")
         store = try! LoggerStore(storeURL: storeURL, options: [.create, .synchronous])
     }
-
-    override func tearDown() {
-        super.tearDown()
-
-        try? store.destroy()
-        directory.remove()
-
-        try? FileManager.default.removeItem(at: URL.temp)
-    }
-
-    // MARK: - Init
 
     func testInitStoreMissing() throws {
         // GIVEN
@@ -91,7 +75,7 @@ final class LoggerStoreTests: XCTestCase {
 
     func testInitWithArchiveURL() throws {
         // GIVEN
-        let storeURL = directory.url.appending(filename: "logs-archive-v2.pulse")
+        let storeURL = directory.url.appending(filename: "logs-archive-latest.pulse")
         try Resources.pulseArchive.write(to: storeURL)
 
         // WHEN
@@ -116,7 +100,7 @@ final class LoggerStoreTests: XCTestCase {
 
     func testInitWithArchiveURLNoExtension() throws {
         // GIVEN
-        let storeURL = directory.url.appending(filename: "logs-archive-v2")
+        let storeURL = directory.url.appending(filename: "logs-archive-latest")
         try Resources.pulseArchive.write(to: storeURL)
 
         // WHEN
@@ -164,118 +148,92 @@ final class LoggerStoreTests: XCTestCase {
         XCTAssertEqual(try store.viewContext.count(for: LoggerBlobHandleEntity.self), 3)
     }
 
-    // MARK: - Copy (Package)
+    // MARK: - Backward Compatibility
 
-    func testCopyDirectory() throws {
+    func testOpenOldStore_v3_1() throws {
         // GIVEN
-        populate(store: store)
-
-        let copyURL = directory.url.appending(filename: "copy.pulse")
+        let storeURL = directory.url.appending(filename: "logs-archive-3-1.pulse")
+        try Resources.pulseArchive_v3_1.write(to: storeURL)
 
         // WHEN
-        try store.copy(to: copyURL)
+        let store = try LoggerStore(storeURL: storeURL)
 
-        // THEN
-        try? store.close()
+        // THEN store version is retained
+        XCTAssertEqual(store.version, "3.1.0")
 
-        // THEN
-        let copy = try LoggerStore(storeURL: copyURL)
-        defer { try? copy.destroy() }
+        // THEN message are loaded
+        let messages = try store.allMessages()
+        XCTAssertEqual(messages.count, 15)
+        let message = try XCTUnwrap(messages.first)
+        XCTAssertEqual(message.level, 3)
+        XCTAssertEqual(message.text, "UIApplication.didFinishLaunching")
+        XCTAssertEqual(message.label, "application")
+        XCTAssertEqual(message.rawMetadata, "custom-metadata-key: value")
 
-        XCTAssertEqual(try copy.allMessages().count, 10)
-        XCTAssertEqual(try copy.allTasks().count, 3)
+        // THEN tasks are loaded
+        let tasks = try store.allTasks()
+        XCTAssertEqual(tasks.count, 8)
+        let task = try XCTUnwrap(tasks.first)
+        XCTAssertEqual(task.url, "https://github.com/profile/valdo")
+
+        // THEN blobs are readable
+        for blob in try store.viewContext.fetch(LoggerBlobHandleEntity.self) {
+            let blob = try XCTUnwrap(blob.data)
+            XCTAssertFalse(blob.isEmpty)
+        }
     }
 
-    func testCopyCreatesInto() throws {
+    func testOpenOldStore_v3_3() throws {
         // GIVEN
-        let store = makeStore()
-        defer { try? store.destroy() }
-
-        populate(store: store)
-        date = Date()
-        let copyURL = directory.url.appending(filename: "copy.pulse")
-        try store.copy(to: copyURL)
+        let storeURL = directory.url.appending(filename: "logs-archive-3-3.pulse")
+        try Resources.pulseArchive_v3_3.write(to: storeURL)
 
         // WHEN
-        let info = try LoggerStore.Info.make(storeURL: copyURL)
+        let store = try LoggerStore(storeURL: storeURL)
 
-        XCTAssertEqual(info.storeVersion, "2.0.3")
-        XCTAssertEqual(info.messageCount, 7)
-        XCTAssertEqual(info.taskCount, 3)
-        XCTAssertEqual(info.blobCount, 3)
-        XCTAssertEqual(info.creationDate, date)
-        XCTAssertEqual(info.modifiedDate, date)
+        // THEN store version is retained
+        XCTAssertEqual(store.version, "3.1.0") // This change was made without incrementing the version
+
+        // THEN message are loaded
+        let messages = try store.allMessages()
+        XCTAssertEqual(messages.count, 15)
+        let message = try XCTUnwrap(messages.first)
+        XCTAssertEqual(message.level, 3)
+        XCTAssertEqual(message.text, "UIApplication.didFinishLaunching")
+        XCTAssertEqual(message.label, "application")
+        XCTAssertEqual(message.rawMetadata, "custom-metadata-key: value")
+
+        // THEN tasks are loaded
+        let tasks = try store.allTasks()
+        XCTAssertEqual(tasks.count, 8)
+        let task = try XCTUnwrap(tasks.last)
+        XCTAssertEqual(task.url, "https://github.com/repos/kean/Nuke")
+
+        // THEN blobs are readable
+        for blob in try store.viewContext.fetch(LoggerBlobHandleEntity.self) {
+            let blob = try XCTUnwrap(blob.data)
+            XCTAssertFalse(blob.isEmpty)
+        }
     }
 
-    func testCopyWithPredicate() throws {
-        // GIVEN
-        populate(store: store)
+    // MARK: - Store Request
 
-        let copyURL = directory.url.appending(filename: "copy.pulse")
-
+    func testStoreRequestWithDefaultLabel() throws {
         // WHEN
-        try store.copy(to: copyURL, predicate: NSPredicate(format: "level == %i", LoggerStore.Level.trace.rawValue))
+        store.storeRequest(URLRequest(url: URL(string: "https://example.com")!), response: nil, error: nil, data: nil)
 
-        // THEN
-        try? store.close()
-
-        // THEN all non-trace messages are removed, as well as network messages
-        // and associated blobs
-        let copy = try LoggerStore(storeURL: copyURL)
-        defer { try? copy.destroy() }
-
-        let context = copy.viewContext
-        XCTAssertEqual(try context.count(for: LoggerMessageEntity.self), 2)
-        XCTAssertEqual(try context.count(for: NetworkTaskEntity.self), 0)
-        XCTAssertEqual(try context.count(for: NetworkTaskProgressEntity.self), 0)
-        XCTAssertEqual(try context.count(for: LoggerBlobHandleEntity.self), 0)
+        // THEN default "network" label is used
+        let message = try XCTUnwrap(store.allMessages().first)
+        XCTAssertEqual(message.label, "network")
     }
 
-    func testCopyToNonExistingFolder() throws {
-        // GIVEN
-        populate(store: store)
-
-        let invalidURL = directory.url
-            .appending(directory: UUID().uuidString)
-            .appending(filename: "copy.pulse")
-
-        // WHEN/THEN
-        XCTAssertThrowsError(try store.copy(to: invalidURL))
-    }
-
-    func testCopyButFileExists() throws {
-        // GIVEN
-        populate(store: store)
-
-        let copyURL = directory.url.appending(filename: "copy.pulse")
-
-        try store.copy(to: copyURL)
-
-        // WHEN/THEN
-        XCTAssertThrowsError(try store.copy(to: copyURL))
-
-        print(copyURL)
-    }
-
-    // MARK: - Copy (Archive)
-
-    func testCopyFile() throws {
-        // GIVEN
-        let storeURL = directory.url.appending(filename: "logs-archive-v2.pulse")
-        try Resources.pulseArchive.write(to: storeURL)
-
-        let store = try XCTUnwrap(LoggerStore(storeURL: storeURL))
-        let copyURL = directory.url.appending(filename: "copy.pulse")
-
+    func testStoreRequestWithCustomLabel() throws {
         // WHEN
-        try store.copy(to: copyURL)
+        store.storeRequest(URLRequest(url: URL(string: "https://example.com")!), response: nil, error: nil, data: nil, label: "auth")
 
-        // THEN
-        let copy = try LoggerStore(storeURL: copyURL)
-        defer { try? copy.destroy() }
-
-        XCTAssertEqual(try copy.allMessages().count, 15)
-        XCTAssertEqual(try copy.allTasks().count, 8)
+        // THEN custom label is used
+        let message = try XCTUnwrap(store.allMessages().first)
+        XCTAssertEqual(message.label, "auth")
     }
 
     // MARK: - File (Readonly)
@@ -301,7 +259,7 @@ final class LoggerStoreTests: XCTestCase {
 
     // MARK: - Expiration
 
-    func testSizeLimit() throws {
+    func testSizeLimit() async throws {
         let store = try! LoggerStore(
             storeURL: directory.url.appending(filename: UUID().uuidString),
             options: [.create, .synchronous],
@@ -322,7 +280,7 @@ final class LoggerStoreTests: XCTestCase {
         let copyURL = directory.url
             .appending(filename: UUID().uuidString)
             .appendingPathExtension("pulse")
-        try store.copy(to: copyURL)
+        try await store.export(to: copyURL)
 
         // SANITY
         var messages = try store.allMessages()
@@ -341,7 +299,7 @@ final class LoggerStoreTests: XCTestCase {
         let copyURL2 = directory.url
             .appending(filename: UUID().uuidString)
             .appendingPathExtension("pulse")
-        try store.copy(to: copyURL2)
+        try await store.export(to: copyURL2)
 
         // THEN unwanted messages were removed
         messages = try context.fetch(LoggerMessageEntity.self)
@@ -358,16 +316,22 @@ final class LoggerStoreTests: XCTestCase {
         // GIVEN the store with 5 minute max age
         let store = makeStore {
             $0.maxAge = 300
+            $0.isAutoStartingSession = false
         }
         defer { try? store.destroy() }
 
+        let sessionOneID = UUID()
+        let sessionTwoID = UUID()
+
         // GIVEN some messages stored before the cutoff date
         date = Date().addingTimeInterval(-1000)
+        store.startSession(.init(id: sessionOneID, startDate: date), info: .make())
         store.storeMessage(label: "deleted", level: .debug, message: "test")
         store.storeRequest(URLRequest(url: URL(string: "example.com/deleted")!), response: nil, error: nil, data: nil)
 
         // GIVEN some messages stored after
         date = Date()
+        store.startSession(.init(id: sessionTwoID, startDate: date), info: .make())
         store.storeMessage(label: "kept", level: .debug, message: "test")
         store.storeRequest(URLRequest(url: URL(string: "example.com/kept")!), response: nil, error: nil, data: nil)
 
@@ -381,13 +345,14 @@ final class LoggerStoreTests: XCTestCase {
         // WHEN
         store.syncSweep()
 
-        // THEN
+        // THEN session one is deleted
+        XCTAssertEqual(try context.fetch(LoggerSessionEntity.self).map(\.id), [sessionTwoID])
         XCTAssertEqual(try context.count(for: LoggerMessageEntity.self), 2)
         XCTAssertEqual(try context.count(for: NetworkTaskEntity.self), 1)
         XCTAssertEqual(try context.count(for: NetworkTaskProgressEntity.self), 0)
         XCTAssertEqual(try context.count(for: LoggerBlobHandleEntity.self), 0)
 
-        XCTAssertEqual(try store.allMessages().first?.label.name, "kept")
+        XCTAssertEqual(try store.allMessages().first?.label, "kept")
         XCTAssertEqual(try store.allTasks().first?.url, "example.com/kept")
     }
 
@@ -395,12 +360,14 @@ final class LoggerStoreTests: XCTestCase {
         // GIVEN the store with 5 minute max age
         let store = makeStore {
             $0.maxAge = 300
+            $0.isAutoStartingSession = false
         }
         defer { try? store.destroy() }
 
         // GIVEN a request with response body stored
         date = Date().addingTimeInterval(-1000)
         let responseData = "body".data(using: .utf8)!
+        store.startSession(.init(id: UUID(), startDate: date), info: .make())
         store.storeRequest(URLRequest(url: URL(string: "example.com/deleted")!), response: nil, error: nil, data: responseData)
 
         // ASSERT
@@ -422,12 +389,14 @@ final class LoggerStoreTests: XCTestCase {
         // GIVEN the store with 5 minute max age
         let store = makeStore {
             $0.maxAge = 300
+            $0.isAutoStartingSession = false
         }
         defer { try? store.destroy() }
 
         // GIVEN a request with response body stored
         date = Date().addingTimeInterval(-1000)
         let responseData = "body".data(using: .utf8)!
+        store.startSession(.init(id: UUID(), startDate: date), info: .make())
         store.storeRequest(URLRequest(url: URL(string: "example.com/deleted1")!), response: nil, error: nil, data: responseData)
         store.storeRequest(URLRequest(url: URL(string: "example.com/deleted2")!), response: nil, error: nil, data: responseData)
 
@@ -447,16 +416,19 @@ final class LoggerStoreTests: XCTestCase {
         // GIVEN the store with 5 minute max age
         let store = makeStore {
             $0.maxAge = 300
+            $0.isAutoStartingSession = false
         }
         defer { try? store.destroy() }
 
         // GIVEN a request with response body stored
         date = Date().addingTimeInterval(-1000)
         let responseData = "body".data(using: .utf8)!
+        store.startSession(.init(id: UUID(), startDate: date), info: .make())
         store.storeRequest(URLRequest(url: URL(string: "example.com/deleted")!), response: nil, error: nil, data: responseData)
 
         // GIVEN a request that's not deleted
         date = Date()
+        store.startSession(.init(id: UUID(), startDate: date), info: .make())
         store.storeRequest(URLRequest(url: URL(string: "example.com/kept")!), response: nil, error: nil, data: responseData)
 
         // ASSERT
@@ -564,6 +536,22 @@ final class LoggerStoreTests: XCTestCase {
         XCTAssertEqual(try store.allMessages().count, 10)
     }
 
+    // MARK: - Remove Session
+
+    func testRemoveSessions() throws {
+        // GIVEN
+        populate(store: store)
+        let sessions = try store.viewContext.fetch(LoggerSessionEntity.self)
+
+        // WHEN
+        store.removeSessions(withIDs: Set(sessions.map(\.id)))
+
+        // THEN
+        XCTAssertEqual(try store.viewContext.fetch(LoggerSessionEntity.self).count, 0)
+        XCTAssertEqual(try store.allMessages().count, 0)
+        XCTAssertEqual(try store.allTasks().count, 0)
+    }
+
     // MARK: - Remove All
 
     func testRemoveAll() throws {
@@ -573,7 +561,6 @@ final class LoggerStoreTests: XCTestCase {
 
         let context = store.viewContext
         XCTAssertEqual(try context.count(for: LoggerMessageEntity.self), 11)
-        XCTAssertEqual(try context.count(for: LoggerLabelEntity.self), 5)
         XCTAssertEqual(try context.count(for: NetworkTaskEntity.self), 3)
         XCTAssertEqual(try context.count(for: NetworkRequestEntity.self), 6)
         XCTAssertEqual(try context.count(for: NetworkResponseEntity.self), 5)
@@ -585,7 +572,6 @@ final class LoggerStoreTests: XCTestCase {
 
         // THEN both message and metadata are removed
         XCTAssertEqual(try context.count(for: LoggerMessageEntity.self), 0)
-        XCTAssertEqual(try context.count(for: LoggerLabelEntity.self), 0)
         XCTAssertEqual(try context.count(for: NetworkTaskEntity.self), 0)
         XCTAssertEqual(try context.count(for: NetworkRequestEntity.self), 0)
         XCTAssertEqual(try context.count(for: NetworkResponseEntity.self), 0)
@@ -635,7 +621,7 @@ final class LoggerStoreTests: XCTestCase {
         })
 
         XCTAssertEqual(request.url, "https://github.com/login")
-        XCTAssertEqual(request.host?.value, "github.com")
+        XCTAssertEqual(request.host, "github.com")
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertEqual(request.type, .dataTask)
         XCTAssertEqual(request.statusCode, 200)
@@ -700,37 +686,15 @@ final class LoggerStoreTests: XCTestCase {
         let info = try store.info()
 
         // THEN
-        XCTAssertEqual(info.storeVersion, "2.0.3")
+        XCTAssertEqual(info.storeVersion, "3.6.0")
         XCTAssertEqual(info.messageCount, 7)
         XCTAssertEqual(info.taskCount, 3)
         XCTAssertEqual(info.blobCount, 3)
     }
 
-    // MARK: - Helpers
-
-    private func makeStore(options: LoggerStore.Options =  [.create, .synchronous], _ closure: (inout LoggerStore.Configuration) -> Void = { _ in }) -> LoggerStore {
-        var configuration = LoggerStore.Configuration()
-        configuration.makeCurrentDate = { [unowned self] in self.date }
-        closure(&configuration)
-
-        return try! LoggerStore(
-            storeURL: directory.url.appending(filename: UUID().uuidString),
-            options: options,
-            configuration: configuration
-        )
-    }
-
-    private func makePulsePackage() throws -> URL {
-        let storeURL = directory.url.appending(filename: UUID().uuidString)
-        let store = try LoggerStore(storeURL: storeURL, options: [.create, .synchronous])
-        populate(store: store)
-        try? store.close()
-        return storeURL
-    }
-
     // MARK: - Measure Export Speed & Size
 
-    func testMeasureExportSize() throws {
+    func testMeasureExportSize() async throws {
         // GIVEN
         let storeURL = try makePulsePackage()
 
@@ -739,15 +703,15 @@ final class LoggerStoreTests: XCTestCase {
         defer { try? store.destroy() }
 
         let copyURL = directory.url.appending(filename: "compressed.pulse")
-        try benchmark(title: "Archive") {
-            try store.copy(to: copyURL)
-        }
+        let start = benchmarkStart()
+        try await store.export(to: copyURL)
+        benchmarkEnd(start, title: "archive")
 
         let size = (try Files.attributesOfItem(atPath: copyURL.path)[.size] as? Int64) ?? 0
         print("Package: \(try storeURL.directoryTotalSize()). Archive: \(size)")
     }
 
-    func _testMeasureExportSizeLarge() throws {
+    func _testMeasureExportSizeLarge() async throws {
         // GIVEN
         let store = makeStore {
             // Thumbnail generation significantly impacts the right speed
@@ -762,9 +726,9 @@ final class LoggerStoreTests: XCTestCase {
         }
 
         let copyURL = directory.url.appending(filename: "compressed.pulse")
-        try benchmark(title: "archive") {
-            try store.copy(to: copyURL)
-        }
+        let start = benchmarkStart()
+        try await store.export(to: copyURL)
+        benchmarkEnd(start, title: "archive")
 
         let size = (try Files.attributesOfItem(atPath: copyURL.path)[.size] as? Int64) ?? 0
         let compressed = try Data(contentsOf: copyURL).compressed()

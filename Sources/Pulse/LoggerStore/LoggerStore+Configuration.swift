@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 import CoreData
@@ -35,6 +35,10 @@ extension LoggerStore {
         /// immediately retransmitted to the remote logger before any entities
         /// are even created.
         public static let synchronous = Options(rawValue: 1 << 2)
+
+        /// Opens store in a readonly mode. It won't perform sweeps and will
+        /// disallow any other modifications.
+        public static let readonly = Options(rawValue: 1 << 3)
     }
 
     /// The store configuration.
@@ -73,10 +77,10 @@ extension LoggerStore {
         /// two weeks will get automatically deleted.
         ///
         /// - note: This option request the store to be instantiated with a
-        /// ``LoggerStore/Options/sweep`` option. The default store supports sweeps.
+        /// ``LoggerStore/Options-swift.struct/sweep`` option. The default store supports sweeps.
         public var maxAge: TimeInterval = 14 * 86400
 
-        /// For tesing purposes.
+        /// For testing purposes.
         var makeCurrentDate: () -> Date = { Date() }
 
         /// Gets called when the store receives an event. You can use it to
@@ -84,6 +88,8 @@ extension LoggerStore {
         /// out some sensitive information. If you return `nil`, the event
         /// is ignored completely.
         public var willHandleEvent: @Sendable (Event) -> Event? = { $0 }
+
+        var isAutoStartingSession = true
 
         /// Initializes the configuration.
         ///

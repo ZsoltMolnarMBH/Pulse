@@ -1,4 +1,280 @@
+# Pulse 4.x
+
+## WIP
+
+- `ConsoleView` no longer supports iOS 14, but the packge can still be installed in projects that require iOS 14
+- Increase minimum deployment target on tvOS 14.0 → 15.0
+- Move some network filters to Pulse for Mac
+- Remove APIs deprecated in Pulse 3.x
+- Move inspectors to the navigation bar on macOS
+- When you import store from watchOS, it now shows an "Open Store" button directly in the Console
+
+### Fixes
+
+- Fix how network tasks details get collapsed in the console on macOS
+
+
+### Pulse for Mac
+
+- Add a simple way to mock network requests
+- New network inspector: new summary, metrics view, cookies viewer, etc
+- Add new headers table-based viewer
+- Add JWT viewer (right click on an HTTP header containing the JWT token to view it)
+- Add new search that now shows suggestions inline, has support for "Logs" filters, and other features introduces in Pulse 3.7.0
+- Add "Group By" support to table view
+- Add double-click to open row in a new window and the respective context menu action
+- Add "Now" mode
+
+# Pulse 3.x
+
+## Pulse 3.7.2
+
+*May 12, 2023*
+
+- Fix #192: status codes in 1XX range were considered failures  
+- Fix #193: synchronization issue during remote logger initialization
+
+## Pulse 3.7.1
+
+*Apr 30, 2023*
+
+- Fix an issue with `LoggerStore/removeAll` removing current session
+
+## Pulse 3.7.0
+
+*Apr 29, 2023*
+
+- Improve search suggestions on macOS that are now [displayed inline](https://user-images.githubusercontent.com/1567433/235319231-caaabe2f-d173-4dca-b585-203c36ee70cc.png) and support the same search options as on iOS
+- Improve how search results are displayed on macOS
+- Improve search scope picker and allow searching for in more scopes
+- Add support for "Logs" filters: File, Label, Level
+- Add strings search options to search on macOS
+- Move "Sort By" and "Group" by options to the context menu
+- Remove custom Message and Network filters that were replaced by the search introduced in [Pulse 3.2](https://kean.blog/post/pulse-search). These custom filters will continue to be available in Pulse for Mac (coming soon)
+- Fix an issue where filters were applies automatically to the search results on macOS
+- Fix an issue with `metadata` search being available for network tasks
+- Fix proactive search result lookup on macOS
+- Fix warnings when updating some observable objects from the background
+- Fix an issue with recent search filters not being saved
+- Fix an issue with logging on physical tvOS devices
+- Fix missing labels in logs
+- Fix the navigation bar item design on iOS 14
+- Fix the missing back button in the response body on iOS 14
+
+## Pulse 3.6.0
+
+*Apr 22, 2023*
+
+### PulseUI
+
+- Add new ["Sessions" screen](https://user-images.githubusercontent.com/1567433/233789699-08700704-0414-4a54-80af-c4c489d8c1d9.png)) where you can see all the previously recorded runs of the app. Tap on a session to see it in the "Console". Tap "Edit" to select one or more sessions, and then share only the selected sessions, delete them, or open them in the "Console".
+- By clicking "Show Previous Session" in the "Console" it now adds only the previous session and not all previous messages like before
+- Update the database schema and the remote logger protocol to support the new session management. The changes are still backward compatible with Pulse Pro 2.x, and the the new Pulse for Mac app is coming to TestFlight soon.
+- Remove the separate "Share Store" button from "Console" menu. This menu is now available when you press the default "Share" in the console. The time range selection is now based on sessions, not time intervals.
+- Add an option to export a store as a macOS package (instead of the archive, which is a default). The package consists of multiple files and makes it easier to view the logger database, but it takes a bit more space and is harder to share as it's essentially a folder.
+- Add "Hide..." and "Show..." menus to messages cells to access quick filters
+
+### Pulse
+
+- Deprecate `LoggerStore/copy` method and introduce a new, more powerful `LoggerStore/export` method that allows to specify the document type (`.archive` or `.package`) and filter the output by sessions. This method is async and also no longer blocks the store's background context.
+- Add `LoggerStore/removeSessions` method for removing session
+- Optimize compression. Now if files don't compress well, `LoggerStore` saves uncompressed data.
+- Make `RemoteLogger.Connection` internal (was public)
+
+### Fixes
+
+- Fix [#183](https://github.com/kean/Pulse/issues/183): two close button in `MainViewController`
+- Fix an issue with store export where blobs larger than inline were encoded in the final file but were never actually accessible after opening the store
+- Fix crash when storing requests with very large timeout interval
+- Fix an issue with `.keyNotFound` decoding errors not being displayed
+- Fix an issue with pending tasks sometimes not updating to completed
+- Fix an issue with the scroll position being reset after scrolling to the bottom and selecting one of the items at the bottom
+- Fix an issue with the details view sometimes popping when going to the bottom of the list
+
+## Pulse 3.5.7
+
+*Apr 9, 2023*
+
+- Fix [#180](https://github.com/kean/Pulse/issues/180): crash when sharing requests
+- Fix layout for pending requests
+- Fix an issue with inconsistent text styles in HTML exports
+    
+## Pulse 3.5.6
+
+*Apr 6, 2023*
+
+- Fix #167: performance issues with `UITextView` on iOS 16
+- Fix #179: console with network mode not filtering out regular logs
+- Add `mode` parameter to the `ConsoleView` initializer that, in addition to `.network`, now also supports `.logs` mode (display only text messages)
+- ConsoleView now automatically adds a close button when presented (use `closeButtonHidden` if you need to hide it)
+- Minor design improvements for cells in the console
+
+## Pulse 3.5.5
+
+*Apr 2, 2023*
+
+- Fix warnings in Xcode 14.3
+- Improve Dynamic Type support
+
+## Pulse 3.5.4
+
+*Mar 10, 2023*
+
+- Fix logging on physical tvOS devices – [#173](https://github.com/kean/Pulse/pull/172) by [@mmmcheese](https://github.com/mmmcheese)
+
+## Pulse 3.5.3
+
+*Mar 5, 2023*
+
+- Improve search performance, especially when dealing with big responses (20+ MB) and short search terms (1 character) that result in a massive number of matches
+- Fix [#165](https://github.com/kean/Pulse/issues/165): crash in search
+
+## Pulse 3.5.2
+
+*Feb 17, 2023*
+
+- Add Swift 5.8 support – [#164](https://github.com/kean/Pulse/pull/164) by [@thedavidharris](https://github.com/thedavidharris)
+
+## Pulse 3.5.1
+
+*Feb 16, 2023*
+
+- Reduce xcframeworks binary size. Pulse 2.1 MB → 823 KB. PulseUI 7.6 MB → 3.9 MB.
+- Reduce PulseUI .swiftmodule size: 4.4 MB → 260 KB.
+- When you focus on one of the groups, it now preserves the order of the logs
+- On iOS, Insights screen now shows all requests for the current session
+- When you open slowest requests, redirects, and failures from the Insights screen, the list now updates automatically as new requests are added
+
+## Pulse 3.5.0
+
+*Feb 11, 2023*
+
+### PulseUI
+
+- Fix [#161](https://github.com/kean/Pulse/issues/161): misleading title for successful local URL requests
+- [macOS] Fix an issue where changing sort descriptors in a table view would affect other display modes
+- [macOS] Fix an issue where on first selection in a text view or search results list, the main panel would reload 
+- The insights view now shows info for the currently selected tasks
+- Fix a crash when sharing store and using "This Session" filter
+
+### Pulse
+
+- Address [#162](https://github.com/kean/Pulse/issues/162): Add `label` parameter to `LoggerStore/storeRequest` and `NetworkLogger/Configuration` to allow customizing the label associated with the created logs 
+- Remove `NetworkLoggerInsights`
+
+## Pulse 3.4.3
+
+*Feb 9, 2023*
+
+- Fix [#155](https://github.com/kean/Pulse/issues/155): fix an issue with `GTMSessionFetcher` not working correctly with automation `URLSessionProxyDelegate` registration enabled
+
+## Pulse 3.4.2
+
+*Feb 7, 2023*
+
+- [macOS] Update the design to use the transparent toolbar and move the inspectors to the native left sidebar 
+- [macOS] Fix an issue with navigation from the metrics screen not working correctly
+- [macOS] Move the button to switch from the horizontal to vertical layout to the details view 
+- [macOS] Fix an issue with text view not scrolling to the selected match when opened from the full-body console search
+
+## Pulse 3.4.1
+
+*Feb 6, 2023*
+
+- Fix selection not working in search results view on macOS
+- Fix transaction details opening an empty page
+- Fix a couple of minor issues in light mode on macOS
+- Use darker background color for details view (mainly text) on macOS
+
+## Pulse 3.4
+
+*Feb 4, 2023*
+
+- Introduce several features from Pulse Pro to the macOS version of the console
+
+## Pulse 3.3
+
+*Jan 30, 2023*
+
+- Redesign the macOS version of the app and introduce some of the feature from Pulse Pro
+- Add the new search that was introduced on iOS in [version 3.2](https://github.com/kean/Pulse/releases/tag/3.2.0)
+
+## Pulse 3.2.2
+
+*Jan 29, 2023*
+
+- Add aucomplete for paths
+- Fix labels/domains selection in filters - [#152](https://github.com/kean/Pulse/pull/152) by [hayek](https://github.com/hayek)
+
+## Pulse 3.2.1
+
+*Jan 27, 2023*
+
+- Fix backward compatibility with Pulse Pro 2.x
+
+## Pulse 3.2
+
+*Jan 24, 2023*
+
+- Add new [powerful search](http://kean.blog/post/pulse-search)
+- Improve console design
+- Add "Sort By" and "Group By" options
+- Display pins at the top
+- Add "Show Previous Session" button to search
+- Other minor changes
+- Add metadata search - [#148](https://github.com/kean/Pulse/pull/148) by [@ejensen](https://github.com/ejensen)
+
+## Pulse 3.1
+
+*Jan 14, 2023*
+
+- Update minimum requirements: Swift 5.7 | Xcode 14.0  | iOS 14.0, tvOS 14.0, watchOS 7.0, macOS 12.0
+- Add `ConsoleView.network` to other platforms (originally was available only on iOS)
+- Fix a couple of minor design issues
+- Fix missing live progress in Console for upload and download tasks
+
+### Filters
+
+- New [message](https://user-images.githubusercontent.com/1567433/212389395-2f60e425-cdc5-47ea-9185-52364ce9120c.png) and [network](https://user-images.githubusercontent.com/1567433/212389402-7c5c8f3e-cde2-4654-95e2-98a2844d7d89.png) filters design on macOS
+- Add search, expand/collapse, enable-all/disable-all buttons to labels and domains filters on all platforms
+- Add a missing "Remove Pins" button on macOS
+- Add a counter next to labels and domains
+- Display labels and domains only visible for the current filter
+- Fix an issue where when you were focusing a log label, it wasn't reflected in the filters
+- Fix an issue where using the "Recent" date filter was applying the "Session" filter instead
+
+### Sharing
+
+- Improve task to `NSAttributedString` generation speed by up to 7x faster. For multiple tasks, there is up to x3 improvement on top of that. And when converting multiple tasks with the same request or response body, you can see up to 90% faster exports. These optimizations affect everything: rendering response bodies, lists of messages, request headers, sharing (regardless of the output format), and more.
+- Improve HTML generation speed by 40% (not including `NSAttributedString` improvements that directly affect it)
+- Add a spinner while preparing a large file for sharing. You can still interact with the app while it's working. Note: it doesn't work with PDF because it has to be used on the main thread.
+- Add some [basic formatting](https://user-images.githubusercontent.com/1567433/212501275-1dae0ef8-ee4a-4d77-aa55-24b026e5d0cc.png)) for plain text output to make it easier to read
+- Fix double dot in shared files extensions
+- Remove share as .pdf from Console and TextView (keep in NetworkInspector) - too slow to be used for any reasonable amount of content
+
+## Pulse 3.0
+
+*Jan 10, 2023*
+
+### Pulse
+
+- Add `includedHosts`, `includedURLs`, `excludedHosts`, and `excludedURLs` to `NetworkLogger/Configuration`. By default, they support simple wildcards, e.g. `*.example.com`, but you can also enable full regex using another new configuration options: `isRegexEnabled`.
+- Add `sensitiveHeaders`, `sensitiveQueryItems`, `sensitiveDataFields` to `NetworkLogger/Configuration` for redacting sentitive information from logged HTTP headers 
+- Add a new convenience initializer to `NetworkLogger` with `configure` trailing closure
+- Make `LoggerStore.Event` frozen
+
+### PulseUI
+
+- A complete overhaul. See https://kean.blog/post/pulse-3 for more details.
+
+
 # Pulse 2.x
+
+## Pulse 2.1.4
+
+*Dec 18, 2022*
+
+- Fix an issue with tabbar transparency (iOS 15 feature) not always working as expected
 
 ## Pulse 2.1.3
 

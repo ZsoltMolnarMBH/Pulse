@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import CoreData
 
@@ -11,17 +11,21 @@ extension LoggerStore {
         typealias Attribute = NSAttributeDescription
         typealias Relationship = NSRelationshipDescription
 
+        let session = Entity(class: LoggerSessionEntity.self)
         let message = Entity(class: LoggerMessageEntity.self)
-        let label = Entity(class: LoggerLabelEntity.self)
-
         let task = Entity(class: NetworkTaskEntity.self)
-        let domain = Entity(class: NetworkDomainEntity.self)
         let progress = Entity(class: NetworkTaskProgressEntity.self)
         let request = Entity(class: NetworkRequestEntity.self)
         let response = Entity(class: NetworkResponseEntity.self)
         let transaction = Entity(class: NetworkTransactionMetricsEntity.self)
-
         let blob = Entity(class: LoggerBlobHandleEntity.self)
+
+        session.properties = [
+            Attribute(name: "id", type: .UUIDAttributeType),
+            Attribute(name: "createdAt", type: .dateAttributeType),
+            Attribute(name: "version", type: .stringAttributeType) { $0.isOptional = true },
+            Attribute(name: "build", type: .stringAttributeType) { $0.isOptional = true }
+        ]
 
         message.properties = [
             Attribute(name: "createdAt", type: .dateAttributeType),
@@ -33,13 +37,8 @@ extension LoggerStore {
             Attribute(name: "function", type: .stringAttributeType),
             Attribute(name: "line", type: .integer32AttributeType),
             Attribute(name: "rawMetadata", type: .stringAttributeType),
-            Relationship(name: "label", type: .oneToOne(), deleteRule: .noActionDeleteRule, entity: label),
+            Attribute(name: "label", type: .stringAttributeType),
             Relationship(name: "task", type: .oneToOne(isOptional: true), entity: task)
-        ]
-
-        label.properties = [
-            Attribute(name: "name", type: .stringAttributeType),
-            Attribute(name: "count", type: .integer64AttributeType),
         ]
 
         task.properties = [
@@ -48,7 +47,7 @@ extension LoggerStore {
             Attribute(name: "taskId", type: .UUIDAttributeType),
             Attribute(name: "taskType", type: .integer16AttributeType),
             Attribute(name: "url", type: .stringAttributeType),
-            Relationship(name: "host", type: .oneToOne(isOptional: true), entity: domain),
+            Attribute(name: "host", type: .stringAttributeType),
             Attribute(name: "httpMethod", type: .stringAttributeType),
             Attribute(name: "statusCode", type: .integer32AttributeType),
             Attribute(name: "errorCode", type: .integer32AttributeType),
@@ -72,11 +71,6 @@ extension LoggerStore {
             Relationship(name: "requestBody", type: .oneToOne(isOptional: true), deleteRule: .noActionDeleteRule, entity: blob),
             Relationship(name: "responseBody", type: .oneToOne(isOptional: true), deleteRule: .noActionDeleteRule, entity: blob),
             Relationship(name: "progress", type: .oneToOne(isOptional: true), entity: progress)
-        ]
-
-        domain.properties = [
-            Attribute(name: "value", type: .stringAttributeType),
-            Attribute(name: "count", type: .integer64AttributeType)
         ]
 
         request.properties = [
@@ -144,11 +138,13 @@ extension LoggerStore {
             Attribute(name: "size", type: .integer32AttributeType),
             Attribute(name: "decompressedSize", type: .integer32AttributeType),
             Attribute(name: "linkCount", type: .integer16AttributeType),
-            Attribute(name: "inlineData", type: .binaryDataAttributeType)
+            Attribute(name: "rawContentType", type: .stringAttributeType),
+            Attribute(name: "inlineData", type: .binaryDataAttributeType),
+            Attribute(name: "isUncompressed", type: .booleanAttributeType)
         ]
 
         let model = NSManagedObjectModel()
-        model.entities = [message, label, task, domain, progress, blob, request, response, transaction]
+        model.entities = [session, message, task, progress, blob, request, response, transaction]
         return model
     }()
 }

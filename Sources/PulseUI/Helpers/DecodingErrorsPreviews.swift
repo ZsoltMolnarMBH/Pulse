@@ -1,14 +1,14 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
-
-import Foundation
-import SwiftUI
-import Pulse
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 #if os(iOS) || os(macOS)
 
 #if DEBUG
+
+import Foundation
+import SwiftUI
+import Pulse
 
 struct DecodingErrors_Previews: PreviewProvider {
     static var previews: some View {
@@ -17,18 +17,25 @@ struct DecodingErrors_Previews: PreviewProvider {
                 .previewDisplayName("Type Mismatch (Object)")
             fileViewer(error: typeMismatchErrorInArray())
                 .previewDisplayName("Type Mismatch (Array)")
-            fileViewer(error: valueNotFoundError())
+            fileViewer(error: valueNotFound())
                 .previewDisplayName("Value Not Found")
             fileViewer(error: keyNotFound())
                 .previewDisplayName("Key Not Found")
             fileViewer(error: dataCorrupted())
                 .previewDisplayName("Data Corrupted")
-
         }
     }
 
+    @ViewBuilder
     private static func fileViewer(error: NetworkLogger.DecodingError) -> some View {
-        FileViewer(viewModel: .init(title: "Response", context: .init(contentType: .init(rawValue: "application/json"), originalSize: 1200, error: error), data: { MockJSON.allPossibleValues }))
+        let viewer = FileViewer(viewModel: .init(title: "Response", context: .init(contentType: .init(rawValue: "application/json"), originalSize: 1200, error: error), data: { MockJSON.allPossibleValues }))
+#if os(iOS)
+        NavigationView {
+            viewer
+        }
+#else
+        viewer
+#endif
     }
 }
 
@@ -54,7 +61,7 @@ private func typeMismatchErrorInArray() -> NetworkLogger.DecodingError {
     return getError(JSON.self)
 }
 
-private func valueNotFoundError() -> NetworkLogger.DecodingError {
+private func valueNotFound() -> NetworkLogger.DecodingError {
     struct JSON: Decodable {
         let actors: [Actor]
 

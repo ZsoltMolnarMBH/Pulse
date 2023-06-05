@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import SwiftUI
 
@@ -8,21 +8,21 @@ struct PlaceholderView: View {
     var imageName: String?
     let title: String
     var subtitle: String?
-
-    #if os(tvOS)
+    
+#if os(tvOS)
     private let iconSize: CGFloat = 150
-    #else
+#else
     private let iconSize: CGFloat = 70
-    #endif
-
-    #if os(macOS)
+#endif
+    
+#if os(macOS)
     private let maxWidth: CGFloat = .infinity
-    #elseif os(tvOS)
+#elseif os(tvOS)
     private let maxWidth: CGFloat = .infinity
-    #else
+#else
     private let maxWidth: CGFloat = 280
-    #endif
-
+#endif
+    
     var body: some View {
         VStack {
             imageName.map(Image.init(systemName:))
@@ -42,45 +42,10 @@ struct PlaceholderView: View {
     }
 }
 
-
-#if os(iOS) || os(macOS) || os(tvOS)
-
-extension PlaceholderView {
-    static func make(viewModel: ConsoleViewModel) -> PlaceholderView {
-        let message: String
-        if viewModel.searchCriteria.isDefaultSearchCriteria {
-            if viewModel.searchCriteria.criteria.dates.isCurrentSessionOnly {
-                message = "There are no messages in the current session."
-            } else {
-                message = "There are no stored messages."
-            }
-        } else {
-            message = "There are no messages for the selected filters."
-        }
-        return PlaceholderView(imageName: "message", title: "No Messages", subtitle: message)
-    }
-
-    static func make(viewModel: NetworkViewModel) -> PlaceholderView {
-        let message: String
-        if viewModel.searchCriteria.isDefaultSearchCriteria {
-            if viewModel.searchCriteria.criteria.dates.isCurrentSessionOnly {
-                message = "There are no network requests in the current session."
-            } else {
-                message = "There are no stored network requests."
-            }
-        } else {
-            message = "There are no network requests for the selected filters."
-        }
-        return PlaceholderView(imageName: "network", title: "No Requests", subtitle: message)
-    }
-}
-
 #if DEBUG
 struct PlaceholderView_Previews: PreviewProvider {
     static var previews: some View {
         PlaceholderView(imageName: "questionmark.folder", title: "Store Unavailable")
     }
 }
-#endif
-
 #endif

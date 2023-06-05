@@ -9,19 +9,22 @@
 ### Initializers
 
 - ``init(storeURL:options:configuration:)``
-- ``Options``
+- ``Options-swift.struct``
 - ``Configuration-swift.struct``
 
 ### Instance Properties
 
 - ``storeURL``
+- ``version``
+- ``options-swift.property``
+- ``session-swift.property``
 - ``isArchive``
 - ``configuration-swift.property``
 
 ### Storing Logs
 
 - ``storeMessage(label:level:message:metadata:file:function:line:)``
-- ``storeRequest(_:response:error:data:metrics:)``
+- ``storeRequest(_:response:error:data:metrics:label:)``
 
 ### Accessing Logs
 
@@ -29,10 +32,16 @@
 - ``allTasks()``
 - ``getBlobData(forKey:)``
 
+### Export
+
+- ``export(to:as:options:)``
+- ``ExportOptions``
+- ``DocumentType``
+- ``copy(to:predicate:)``
+
 ### Managing the Store
 
 - ``removeAll()``
-- ``copy(to:predicate:)``
 - ``close()``
 - ``destroy()``
 
@@ -63,8 +72,4 @@
 - ``Metadata``
 - ``MetadataValue``
 - ``Error``
-- ``Session``
-
-### Deprecated
-
-- ``default``
+- ``Session-swift.struct``

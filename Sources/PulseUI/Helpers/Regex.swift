@@ -1,16 +1,10 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 
-final class Regex {
-    static var isDebugModeEnabled = false
-
-    var numberOfCaptureGroups: Int {
-        return regex.numberOfCaptureGroups
-    }
-
+final class RegExp {
     private let regex: NSRegularExpression
 
     struct Options: OptionSet {
@@ -57,17 +51,9 @@ final class Regex {
     }
 }
 
-extension Regex {
+extension RegExp {
     struct Match {
         let fullMatch: Substring
         let groups: [Substring]
-    }
-}
-
-extension Regex {
-    struct Error: Swift.Error, LocalizedError {
-        let message: String
-        let index: Int
-        var pattern: String = ""
     }
 }

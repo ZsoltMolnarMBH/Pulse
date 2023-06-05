@@ -1,13 +1,13 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 struct Version: Comparable, LosslessStringConvertible, Codable, Sendable {
     let major: Int
     let minor: Int
     let patch: Int
 
-    init(_ major: Int, _ minor: Int, _ patch: Int, prereleaseIdentifiers: [String] = []) {
+    init(_ major: Int, _ minor: Int, _ patch: Int) {
         precondition(major >= 0 && minor >= 0 && patch >= 0, "Negative versioning is invalid.")
         self.major = major
         self.minor = minor

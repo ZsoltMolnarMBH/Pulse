@@ -1,32 +1,50 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
+import Foundation
 import CoreData
+import Pulse
+import Combine
+import SwiftUI
 
-final class ManagedObjectsObserver<T: NSManagedObject>: NSObject, ObservableObject, NSFetchedResultsControllerDelegate {
-    private let controller: NSFetchedResultsController<T>
+final class ManagedObjectsObserver<T: NSManagedObject>: NSObject, NSFetchedResultsControllerDelegate {
     @Published private(set) var objects: [T] = []
 
-    init(context: NSManagedObjectContext, sortDescriptior: NSSortDescriptor) {
-        let request = NSFetchRequest<T>(entityName: "\(T.self)")
-        request.fetchBatchSize = 100
-        request.sortDescriptors = [sortDescriptior]
+    private let controller: NSFetchedResultsController<T>
 
-        self.controller = NSFetchedResultsController(fetchRequest: request, managedObjectContext: context, sectionNameKeyPath: nil, cacheName: nil)
-
+    init(request: NSFetchRequest<T>,
+         context: NSManagedObjectContext,
+         cacheName: String? = nil) {
+        self.controller = NSFetchedResultsController(fetchRequest: request, managedObjectContext: context, sectionNameKeyPath: nil, cacheName: cacheName)
         super.init()
 
-        self.controller.delegate = self
-        self.refresh()
-    }
-
-    private func refresh() {
         try? controller.performFetch()
-        self.objects = controller.fetchedObjects ?? []
+        objects = controller.fetchedObjects ?? []
+
+        controller.delegate = self
     }
 
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        self.objects = self.controller.fetchedObjects ?? []
+        objects = self.controller.fetchedObjects ?? []
+    }
+}
+
+extension ManagedObjectsObserver where T == LoggerMessageEntity {
+    static func pins(for context: NSManagedObjectContext) -> ManagedObjectsObserver {
+        let request = NSFetchRequest<LoggerMessageEntity>(entityName: "\(LoggerMessageEntity.self)")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \LoggerMessageEntity.createdAt, ascending: false)]
+        request.predicate = NSPredicate(format: "isPinned == YES")
+
+        return ManagedObjectsObserver(request: request, context: context, cacheName: "com.github.pulse.pins-cache")
+    }
+}
+
+extension ManagedObjectsObserver where T == LoggerSessionEntity {
+    static func sessions(for context: NSManagedObjectContext) -> ManagedObjectsObserver {
+        let request = NSFetchRequest<LoggerSessionEntity>(entityName: "\(LoggerSessionEntity.self)")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \LoggerSessionEntity.createdAt, ascending: false)]
+
+        return ManagedObjectsObserver(request: request, context: context, cacheName: "com.github.pulse.sessions-cache")
     }
 }

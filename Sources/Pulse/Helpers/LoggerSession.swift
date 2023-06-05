@@ -1,27 +1,20 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
-#if !os(macOS) && !targetEnvironment(macCatalyst) && swift(>=5.7)
 import Foundation
-#else
-@preconcurrency import Foundation
-#endif
 
 extension LoggerStore {
-    public struct Session: Sendable {
+    public struct Session: Codable, Sendable {
         public let id: UUID
+        public let startDate: Date
 
-        public init(id: UUID = UUID()) {
+        public init(id: UUID = UUID(), startDate: Date = Date()) {
             self.id = id
+            self.startDate = startDate
         }
 
         /// Returns current log session.
-        public static var current = Session()
-
-        /// Starts a new log session.
-        public static func startSession() {
-            LoggerStore.Session.current = Session()
-        }
+        public static let current = Session()
     }
 }

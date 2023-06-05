@@ -1,33 +1,37 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020–2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020–2023 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 import Network
+#if PULSE_STANDALONE_APP
+import Pulse
+#endif
 
-@available(iOS 14.0, tvOS 14.0, *)
-public protocol RemoteLoggerConnectionDelegate: AnyObject {
+protocol RemoteLoggerConnectionDelegate: AnyObject {
     func connection(_ connection: RemoteLogger.Connection, didChangeState newState: NWConnection.State)
     func connection(_ connection: RemoteLogger.Connection, didReceiveEvent event: RemoteLogger.Connection.Event)
 }
 
-@available(iOS 14.0, tvOS 14.0, *)
 extension RemoteLogger {
-    public final class Connection {
+    final class Connection {
+        var endpoint: NWEndpoint { connection.endpoint }
         private let connection: NWConnection
         private var buffer = Data()
+        private var id: UInt32 = 0
+        private var handlers: [UInt32: (Data?, Error?) -> Void] = [:]
+        
+        weak var delegate: RemoteLoggerConnectionDelegate?
 
-        public weak var delegate: RemoteLoggerConnectionDelegate?
-
-        public convenience init(endpoint: NWEndpoint) {
+        convenience init(endpoint: NWEndpoint) {
             self.init(NWConnection(to: endpoint, using: .tcp))
         }
 
-        public init(_ connection: NWConnection) {
+        init(_ connection: NWConnection) {
             self.connection = connection
         }
 
-        public func start(on queue: DispatchQueue) {
+        func start(on queue: DispatchQueue) {
             connection.stateUpdateHandler = { [weak self] in
                 guard let self = self else { return }
                 self.delegate?.connection(self, didChangeState: $0)
@@ -36,15 +40,15 @@ extension RemoteLogger {
             connection.start(queue: queue)
         }
 
-        public enum Event {
+        enum Event {
             case packet(Packet)
             case error(Error)
             case completed
         }
 
-        public struct Packet {
-            public let code: UInt8
-            public let body: Data
+        struct Packet {
+            let code: UInt8
+            let body: Data
         }
 
         private func receive() {
@@ -96,38 +100,101 @@ extension RemoteLogger {
                 if case .notEnoughData? = error as? PacketParsingError {
                     return nil
                 }
-                log("Unexpected error when processing a packet: \(error)")
+                pulseLog("Unexpected error when processing a packet: \(error)")
                 return nil
             }
         }
 
         private func send(event: Event) {
-            delegate?.connection(self, didReceiveEvent: event)
+            // If it's a response for a message, pass it to the registered handler.
+            // Otherwise, send it to the delegate as a new message.
+            if case .packet(let packet) = event,
+               packet.code == RemoteLogger.PacketCode.message.rawValue,
+               let header = Message.Header(packet.body),
+               header.options.contains(.response),
+               let handler = handlers.removeValue(forKey: header.id) {
+                handler(try? Message.decode(packet.body).data, nil)
+            } else {
+                delegate?.connection(self, didReceiveEvent: event)
+            }
         }
-
-        public func send(code: UInt8, data: Data, _ completion: ((NWError?) -> Void)? = nil) {
+        
+        func send(code: UInt8, data: Data) {
             do {
                 let data = try encode(code: code, body: data)
                 connection.send(content: data, completion: .contentProcessed({ error in
                     if error != nil {
-                        log("\(String(describing: error))")
+                        pulseLog("\(String(describing: error))")
                     }
                 }))
             } catch {
-                log("Failed to encode a packet: \(error)") // Should never happen
+                pulseLog("Failed to encode a packet: \(error)") // Should never happen
             }
         }
 
-        public func send<T: Encodable>(code: UInt8, entity: T, _ completion: ((NWError?) -> Void)? = nil) {
+        func send<T: Encodable>(code: UInt8, entity: T) {
             do {
                 let data = try JSONEncoder().encode(entity)
-                send(code: code, data: data, completion)
+                send(code: code, data: data)
             } catch {
-                log("Failed to encode a packet: \(error)") // Should never happen
+                pulseLog("Failed to encode a packet: \(error)") // Should never happen
+            }
+        }
+    
+        func sendMessage<T: Encodable>(path: Path, entity: T, _ completion: ((Data?, Error?) -> Void)? = nil) {
+            do {
+                sendMessage(path: path, data: try JSONEncoder().encode(entity), completion)
+            } catch {
+                pulseLog("Failed to encode a packet: \(error)") // Should never happen
+            }
+        }
+        
+        func sendMessage(path: Path, data: Data? = nil, _ completion: ((Data?, Error?) -> Void)? = nil) {
+            let message = Message(id: id, options: [], path: path, data: data ?? Data())
+            
+            if id == UInt32.max {
+                id = 0
+            } else {
+                id += 1
+            }
+            
+            if let completion = completion {
+                let id = message.id
+                handlers[message.id] = completion
+                connection.queue?.asyncAfter(deadline: .now() + .seconds(20)) { [weak self] in
+                    if let handler = self?.handlers.removeValue(forKey: id) {
+                        handler(nil, URLError(.timedOut))
+                    }
+                }
+            }
+            
+            do {
+                let data = try Message.encode(message)
+                send(code: .message, data: data)
+            } catch {
+                pulseLog("Failed to encode message: \(error)") // Should never happen
             }
         }
 
-        public func cancel() {
+        func sendResponse<T: Encodable>(for message: Message, entity: T) {
+            do {
+                sendResponse(for: message, data: try JSONEncoder().encode(entity))
+            } catch {
+                pulseLog("Failed to encode a packet: \(error)") // Should never happen
+            }
+        }
+        
+        func sendResponse(for message: Message, data: Data) {
+            let message = Message(id: message.id, options: [.response], path: message.path, data: data)
+            do {
+                let data = try Message.encode(message)
+                send(code: .message, data: data)
+            } catch {
+                pulseLog("Failed to encode message: \(error)") // Should never happen
+            }
+        }
+        
+        func cancel() {
             connection.cancel()
         }
     }
@@ -135,7 +202,6 @@ extension RemoteLogger {
 
 // MARK: Helpers
 
-@available(iOS 14.0, tvOS 14.0, *)
 extension RemoteLogger {
     static func encode(code: UInt8, body: Data) throws -> Data {
         guard body.count < UInt32.max else {

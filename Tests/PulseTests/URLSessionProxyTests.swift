@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020-2023 Alexander Grebenyuk (github.com/kean).
 
 import XCTest
 import Foundation
@@ -59,7 +59,7 @@ final class URLSessionProxyTests: XCTestCase {
         XCTAssertEqual(task.requestState, NetworkTaskEntity.State.success.rawValue)
 
         let message = try XCTUnwrap(task.message)
-        XCTAssertEqual(message.label.name, "network")
+        XCTAssertEqual(message.label, "network")
     }
 
     func testRecordError() throws {
@@ -89,6 +89,6 @@ final class URLSessionProxyTests: XCTestCase {
         XCTAssertEqual(task.requestState, NetworkTaskEntity.State.failure.rawValue)
 
         let message = try XCTUnwrap(task.message)
-        XCTAssertEqual(message.label.name, "network")
+        XCTAssertEqual(message.label, "network")
     }
 }

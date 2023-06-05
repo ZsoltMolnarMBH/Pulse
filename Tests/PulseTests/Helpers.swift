@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2020-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2020-2023 Alexander Grebenyuk (github.com/kean).
 
 import XCTest
 import Foundation
@@ -28,4 +28,22 @@ struct TemporaryDirectory {
     func remove() {
         try? FileManager.default.removeItem(at: url)
     }
+}
+
+@discardableResult
+func benchmark<T>(title: String, operation: () throws -> T) rethrows -> T {
+    let startTime = CFAbsoluteTimeGetCurrent()
+    let value = try operation()
+    let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+    print("Time elapsed for \(title): \(timeElapsed * 1000.0) ms.")
+    return value
+}
+
+func benchmarkStart() -> CFAbsoluteTime {
+    CFAbsoluteTimeGetCurrent()
+}
+
+func benchmarkEnd(_ startTime: CFAbsoluteTime, title: String) {
+    let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+    print("Time elapsed for \(title): \(timeElapsed * 1000.0) ms.")
 }
